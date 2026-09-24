@@ -1,0 +1,35 @@
+tarea:
+  id: "U2_T2"
+  nombre: "Unidad 2 - Tarea 2: Métodos Abiertos"
+  materia: "Métodos Numéricos"
+
+ponderacion:
+  automatico: 0.9
+  manual: 0.30
+
+evaluacion:
+  tolerancia_porcentual: 1e-4
+  max_iter_defecto: 100
+  apps_script_url: "https://script.google.com/macros/s/AKfycbwQOF7UOUmIRMAjWI7lekFl_KXDM5KkJPGLk8QNJmPW/dev"
+
+slots:
+  - id: 1
+    tipo: "teorica"
+    banco: "INTRO"
+    peso: 10
+  - id: 2
+    tipo: "ejercicio_num"
+    metodo: "PF"
+    peso: 20
+  - id: 3
+    tipo: "ejercicio_num"
+    metodo: "NR"
+    peso: 20
+  - id: 4
+    tipo: "ejercicio_num"
+    metodo: "SEC"
+    peso: 20
+  - id: 5
+    tipo: "teorica"
+    banco: "CONCL"
+    peso: 10

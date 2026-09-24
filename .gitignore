@@ -6,8 +6,8 @@ __pycache__/
 # --- Herramientas de profesor (NO se publican) ---
 # El alumno recibe SOLO el cuaderno y grader_ofuscado.txt.
 # Todo lo demas que quede en el repo lo vera al clonarlo en Colab.
-profe/
-U2_T2_Metodos_abiertos.ipynb
+#profe/
+#U2_T2_Metodos_abiertos.ipynb
 Info metodos.md
 README.md
 

@@ -1,0 +1,21 @@
+INTRO:
+  - id: "intro_01"
+    titulo: "Naturaleza de los Métodos Abiertos"
+    pregunta: "A diferencia de los métodos cerrados, los métodos abiertos:"
+    opciones:
+      - "a) Garantizan siempre la convergencia a la raíz."
+      - "b) Requieren un intervalo [a, b] donde f(a)*f(b) < 0."
+      - "c) Usan uno o dos valores iniciales y pueden divergir si la estimación es lejana."
+      - "d) Solo funcionan con polinomios de grado par."
+    correcta: 2
+
+CONCL:
+  - id: "concl_01"
+    titulo: "Criterio de Selección de Algoritmos"
+    pregunta: "Si necesitas programar un algoritmo en un microcontrolador donde la derivada analítica f'(x) es muy compleja de calcular, ¿qué método abierto es el más recomendable?"
+    opciones:
+      - "a) Newton-Raphson Estándar"
+      - "b) Método de la Secante o Secante Modificada"
+      - "c) Bisección"
+      - "d) Regula Falsi"
+    correcta: 1
