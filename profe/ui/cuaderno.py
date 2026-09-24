@@ -25,7 +25,7 @@ import json
 import numpy as np
 
 from profe.config import buscar, obtener_configuracion
-from profe.core import METODOS_MANO, NOMBRE_METODO, elegir_mano
+from profe.core import METODOS_MANO, NOMBRE_FUNCION, NOMBRE_METODO, elegir_mano
 from profe.core.evaluator import Tarea
 from profe.core.seed import extraer_nc, generar_semilla, obtener_rng
 from profe.core.solvers import iteraciones
@@ -211,6 +211,12 @@ def _render_pregunta(i, p, peso=None, total=None):
     _display(_markdown('#### Pregunta %d: %s' % (i, p['titulo'])))
     if peso is not None and total:
         _display(_markdown('**Valor:** $\\frac{%g}{%g}$ puntos' % (peso, total)))
+    # Las preguntas de iteraciones traen el ejercicio al que se refieren: hay
+    # que enseñarlo, o el alumno no tiene de dónde sacar la tabla.
+    if p.get('_mostrar_ejercicio') and p.get('_ej'):
+        ej = p['_ej']
+        _display(_markdown('**Ejercicio:** %s' % ej['titulo']))
+        _display(_markdown(ej['contexto'].strip()))
     _display(_markdown(p['texto']))
     if p['tipo'] == 'funcion':
         _display(_markdown(
@@ -286,6 +292,85 @@ def _respuestas_del_cuaderno(marco):
     return res
 
 
+# Casos de prueba con solución conocida: sirven para comprobar la función del
+# alumno cuando SU ejercicio es de los que no convergen (los "trampa" de PF).
+CASOS_PRUEBA = {
+    'PF': ('pf(lambda x: (2*x + 3)**0.5, 1.25)', 'x* = 3'),
+    'PFM': ('pfm(lambda x: (2*x + 3)**0.5, 1.25, 0.5)', 'x* = 3'),
+    'NR': ('nr(lambda x: x**3 - 2*x - 5, lambda x: 3*x**2 - 2, 2.0)', 'x* = 2.094551'),
+    'NRM': ('nrm(lambda x: x**3 - 2*x - 5, lambda x: 3*x**2 - 2, lambda x: 6*x, 2.0)',
+            'x* = 2.094551'),
+    'SEC': ('secante(lambda x: x**3 - 2*x - 5, 1.0, 3.0)', 'x* = 2.094551'),
+    'SM': ('secmod(lambda x: x**3 - 2*x - 5, 2.0, 0.01)', 'x* = 2.094551'),
+}
+
+
+def comparar_practica(metodo, ej, resultado):
+    """
+    Compara lo que devolvió la función del alumno con la referencia del
+    ejercicio y le dice con claridad si el problema es su código o el
+    despeje.
+
+    `resultado` = lo que devolvió su función: (raiz, n_iteraciones).
+    """
+    nombre = NOMBRE_FUNCION.get(metodo, metodo)
+    try:
+        raiz, n = float(resultado[0]), int(resultado[1])
+    except (TypeError, IndexError, ValueError):
+        print('\u26a0\ufe0f Tu %s no devolvió una tupla (raiz, n_iteraciones): %r'
+              % (nombre, resultado))
+        return
+
+    print('tu %-8s: raiz = %.8f   iteraciones = %d' % (nombre, raiz, n))
+
+    # `raiz` del ejercicio es la raíz que se busca: la de la tabla cuando la
+    # iteración converge, o la analítica cuando el despeje se la pierde.
+    ref = ej.get('raiz')
+    coincide = (ref is not None and
+                builtins.abs(raiz - ref) <= 1e-4 * builtins.max(1.0, builtins.abs(ref)))
+
+    if ej.get('_conv'):
+        print('referencia : raiz = %.8f   iteraciones = %d' % (ref, len(ej['_filas'])))
+        if coincide:
+            print('   \u2705 coincide con la referencia. Las iteraciones pueden diferir:')
+            print('      la tabla para con \u03b5s = %g %% y tu función usa tol = 1e-6'
+                  % ej.get('_es', 0.01))
+        else:
+            print('   \u274c NO coincide con la referencia: revisa tu función antes de seguir')
+        return
+
+    # Ejercicio de los que NO convergen (los "trampa" de punto fijo).
+    print('referencia : con el despeje del enunciado la iteración NO converge')
+    if ref is not None:
+        print('             (la raíz que se busca es x* = %.8f: hay que cambiar de despeje)'
+              % ref)
+    if coincide:
+        print('   \u2705 Tu función SÍ llegó a la raíz: la probaste con otro despeje, no')
+        print('      con el del enunciado. Lo que falla es la iteración del enunciado.')
+    else:
+        print('\u26a0\ufe0f Tu función no está mal: es el despeje del enunciado el que no')
+        print("   converge (mira |g'(x*)| en el laboratorio de arriba). Compruébala con")
+        print('   un caso que sí converge:')
+        cmd, valor = CASOS_PRUEBA.get(metodo, ('', ''))
+        if cmd:
+            print('       %s   ->   %s' % (cmd, valor))
+
+
+def _mostrar_resultados(filas):
+    """Tabla de resultados de la calificación (la usa `calificar`)."""
+    iconos = {'correcta': '\u2705', 'parcial': '\U0001f7e1',
+              'incorrecta': '\u274c', 'sin respuesta': '\u26a0\ufe0f'}
+    print('%-4s %-12s %-8s %s' % ('#', 'estado', 'puntos', 'respuesta'))
+    print('-' * 62)
+    for fila in filas:
+        val = fila['val']
+        if isinstance(val, (tuple, list)) and val and isinstance(val[0], tuple):
+            val = 'programa (%d casos)' % len(val)
+        print('%-4d %-12s %-8s %s' % (fila['i'], iconos[fila['estado']],
+                                      '%g/%g' % (fila['puntos'], fila['peso']), val))
+    print('-' * 62)
+
+
 def calificar(marco=None):
     """Califica las 14 preguntas automáticas y muestra el detalle."""
     ex = _EXAMEN
@@ -297,19 +382,12 @@ def calificar(marco=None):
     respuestas = _respuestas_del_cuaderno(marco)
     filas = ex.calificar(respuestas, marco)
 
-    iconos = {'correcta': '✅', 'parcial': '🟡', 'incorrecta': '❌', 'sin respuesta': '⚠️'}
-    puntos, maximo = 0.0, 0.0
-    print('%-4s %-12s %-8s %s' % ('#', 'estado', 'puntos', 'respuesta'))
-    print('-' * 62)
+    puntos = 0.0
+    maximo = 0.0
     for fila in filas:
         puntos += fila['puntos']
         maximo += fila['peso']
-        val = fila['val']
-        if isinstance(val, (tuple, list)) and val and isinstance(val[0], tuple):
-            val = 'programa (%d casos)' % len(val)
-        print('%-4d %-12s %-8s %s' % (fila['i'], iconos[fila['estado']],
-                                      '%g/%g' % (fila['puntos'], fila['peso']), val))
-    print('-' * 62)
+    _mostrar_resultados(filas)
     print('AUTOMÁTICO: %.1f / %g  =  %.1f %%' % (puntos, maximo, 100.0 * puntos / maximo))
     return puntos, maximo
 
@@ -596,9 +674,9 @@ def semilla_de(alumno_id):
 
 
 __all__ = [
-    'COLUMNAS_EXPL', 'ENCABEZADOS', 'ORDEN_COLUMNAS',
-    'calificar', 'enviar', 'generar_examen', 'generar_tarea', 'hoja_manual',
-    'iteraciones', 'mano_comprueba', 'mano_ecuacion', 'mano_enunciado',
-    'mano_referencia', 'mano_solucion', 'pregunta', 'tabla', 'tabla_df',
-    'tabla_en_blanco'
+    'CASOS_PRUEBA', 'COLUMNAS_EXPL', 'ENCABEZADOS', 'ORDEN_COLUMNAS',
+    'calificar', 'comparar_practica', 'enviar', 'generar_examen', 'generar_tarea',
+    'hoja_manual', 'iteraciones', 'mano_comprueba', 'mano_ecuacion',
+    'mano_enunciado', 'mano_referencia', 'mano_solucion', 'pregunta', 'tabla',
+    'tabla_df', 'tabla_en_blanco'
 ]

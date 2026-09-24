@@ -36,10 +36,12 @@ from profe.core import (
 )
 from profe.core.evaluator import Tarea
 from profe.ui.cuaderno import (
+    CASOS_PRUEBA,
     COLUMNAS_EXPL,
     ENCABEZADOS,
     ORDEN_COLUMNAS,
     calificar,
+    comparar_practica,
     enviar,
     generar_examen,
     generar_tarea,
@@ -81,15 +83,16 @@ BANCO_INTRO = (_PREGUNTAS or {}).get('INTRO', [])
 BANCO_CONCL = (_PREGUNTAS or {}).get('CONCL', [])
 
 __all__ = [
-    'APPS_SCRIPT_URL', 'BANCO_CONCL', 'BANCO_INTRO', 'COLUMNAS_EXPL',
-    'EJERCICIOS', 'ENCABEZADOS', 'ES_DEFECTO', 'Examen', 'MANO_FABRICA',
-    'MAX_ITER', 'METODOS_MANO', 'MIN_APROBACION', 'NOMBRE_FUNCION',
-    'NOMBRE_METODO', 'NOMBRE_TAREA', 'ORDEN_COLUMNAS', 'PESO_AUTO',
-    'PESO_MANO', 'TAREA', 'TIPOS', 'TOLERANCIA', 'Tarea', 'WEBHOOK_TOKEN',
-    'buscar', 'cargar_yaml', 'calificar', 'elegir', 'elegir_mano', 'enviar',
-    'extraer_nc', 'generar_examen', 'generar_semilla', 'generar_tarea',
-    'hoja_manual', 'iteracion_objetivo', 'iteraciones', 'mano_comprueba',
-    'mano_ecuacion', 'mano_enunciado', 'mano_referencia', 'mano_solucion',
-    'obtener_configuracion', 'obtener_rng', 'pregunta', 'resolver', 'semilla',
-    'semilla_de', 'tabla', 'tabla_df', 'tabla_en_blanco',
+    'APPS_SCRIPT_URL', 'BANCO_CONCL', 'BANCO_INTRO', 'CASOS_PRUEBA',
+    'COLUMNAS_EXPL', 'EJERCICIOS', 'ENCABEZADOS', 'ES_DEFECTO', 'Examen',
+    'MANO_FABRICA', 'MAX_ITER', 'METODOS_MANO', 'MIN_APROBACION',
+    'NOMBRE_FUNCION', 'NOMBRE_METODO', 'NOMBRE_TAREA', 'ORDEN_COLUMNAS',
+    'PESO_AUTO', 'PESO_MANO', 'TAREA', 'TIPOS', 'TOLERANCIA', 'Tarea',
+    'WEBHOOK_TOKEN', 'buscar', 'cargar_yaml', 'calificar', 'comparar_practica',
+    'elegir', 'elegir_mano', 'enviar', 'extraer_nc', 'generar_examen',
+    'generar_semilla', 'generar_tarea', 'hoja_manual', 'iteracion_objetivo',
+    'iteraciones', 'mano_comprueba', 'mano_ecuacion', 'mano_enunciado',
+    'mano_referencia', 'mano_solucion', 'obtener_configuracion', 'obtener_rng',
+    'pregunta', 'resolver', 'semilla', 'semilla_de', 'tabla', 'tabla_df',
+    'tabla_en_blanco',
 ]

@@ -15,7 +15,7 @@ import urllib.request
 import numpy as np
 
 from profe.config import buscar, obtener_configuracion
-from profe.core import NOMBRE_FUNCION, NOMBRE_METODO, elegir
+from profe.core import NOMBRE_FUNCION, NOMBRE_METODO, elegir, elegir_mano
 from profe.core.helpers import _fmt
 from profe.core.seed import extraer_nc, obtener_rng
 from profe.core.solvers import iteracion_objetivo
@@ -111,14 +111,22 @@ class Tarea(object):
 
     def _generar_ejercicio_num(self, metodo):
         """
-        Pregunta de iteraciones. Tres variantes, como en el motor original:
+        Pregunta de iteraciones sobre EL MISMO ejercicio de la actividad a
+        mano de esa sección. Tres variantes, como en el motor original:
           0,1) ¿en qué iteración εa cae por debajo de εs?
           2)   pregunta conceptual de opción múltiple
-        Un ejercicio cuyo despeje NO converge siempre cae en la conceptual.
+        Si con ese εs la iteración no converge (o no alcanza en max_iter), la
+        pregunta es la conceptual: no habría ningún número que reportar.
         """
-        ej = elegir(metodo, self.rng)
         variante = int(self.rng.integers(0, 3))
         es = self.criterios_paro[int(self.rng.integers(0, len(self.criterios_paro)))]
+
+        # Misma semilla y mismo catálogo que `mano_enunciado`: el alumno ya
+        # tiene delante ese enunciado (y su tabla en blanco). Además la tabla
+        # se calcula CON el εs que se pregunta, así que la respuesta siempre
+        # existe dentro de la tabla.
+        rng_mano = obtener_rng(self.nc, self.id_tarea, 'mano', metodo)
+        ej = elegir_mano(metodo, rng_mano, es=es)
 
         if not ej.get('_conv'):
             variante = 2
@@ -126,18 +134,17 @@ class Tarea(object):
         if variante < 2:
             filas = ej.get('_filas') or []
             k = iteracion_objetivo(filas, es)
-            if k is None or not ej.get('_conv'):
-                k = builtins.max(2, builtins.min(len(filas), 3))
-                es = filas[k - 1]['ea'] * 2.0
-                k = iteracion_objetivo(filas, es) or k
+            if k is None:
+                # Respaldo: con un ejercicio convergente no debería llegar aquí.
+                k = builtins.min(builtins.len(filas), 3) or 3
             texto = (
-                '**%s** (tabla de iteraciones).\n\n'
                 'Con el criterio de paro $\\varepsilon_s=%s\\%%$, revisa la tabla de '
-                'iteraciones de tu ejercicio y contesta: **¿en qué iteración el error '
-                'aproximado $\\varepsilon_a$ queda por primera vez por debajo de '
+                'iteraciones del ejercicio de arriba (el mismo de **tu actividad a '
+                'mano**) y contesta: **¿en qué iteración el error aproximado '
+                '$\\varepsilon_a$ queda por primera vez por debajo de '
                 '$\\varepsilon_s$?**\n\n'
                 'Escribe solo el número entero de la iteración (por ejemplo `4`).'
-                % (ej['titulo'], _fmt(es, 4))
+                % _fmt(es, 4)
             )
             p = {
                 'titulo': 'Iteraciones: %s' % NOMBRE_METODO.get(metodo, metodo),
@@ -146,6 +153,7 @@ class Tarea(object):
                 'tol': TOL_ITERACION,
                 '_ej': ej,
                 '_es': es,
+                '_mostrar_ejercicio': True,
             }
             return p, float(k)
 
