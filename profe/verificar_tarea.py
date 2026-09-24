@@ -16,7 +16,6 @@ Comprueba, sobre 40 numeros de control:
 Uso:  python profe/verificar_tarea.py
 """
 import builtins
-import importlib.util
 import math
 import os
 import sys
@@ -24,7 +23,6 @@ import traceback
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RAIZ = os.path.dirname(AQUI)
-GRADER = os.path.join(AQUI, 'grader.py')
 
 FALLOS = []
 AVISOS = []
@@ -44,11 +42,14 @@ def aviso(msg):
 # Carga del grader como modulo
 # ---------------------------------------------------------------------
 def cargar():
-    spec = importlib.util.spec_from_file_location('grader_u2t2', GRADER)
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules['grader_u2t2'] = mod
-    spec.loader.exec_module(mod)
-    return mod
+    """
+    Importa la fachada del motor (`profe/grader.py`) como módulo. La raíz del
+    proyecto tiene que estar en sys.path: la fachada importa `profe.core`.
+    """
+    if RAIZ not in sys.path:
+        sys.path.insert(0, RAIZ)
+    import profe.grader
+    return profe.grader
 
 
 # ---------------------------------------------------------------------

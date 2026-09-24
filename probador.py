@@ -1,39 +1,75 @@
 # -*- coding: utf-8 -*-
 """
-probador.py — Herramienta local para inspeccionar y probar ejercicios por NC.
+probador.py — Herramienta local para inspeccionar un ejercicio por NC.
+
+    python probador.py                       # NC y método por omisión
+    python probador.py 16330887 PF           # número de control y método
+    python probador.py 16330887 PF mano      # el ejercicio de la actividad a mano
+
+Muestra el enunciado tal como lo ve el alumno y la tabla de iteraciones de
+referencia que usa el motor para calificar.
 """
-import math
-from profe.core.seed import obtener_rng
-from profe.core.registry import elegir, NOMBRE_METODO
+import builtins
+import sys
 
-def probar_ejercicio(nc="16330887", metodo="NR"):
-    print(f"=" * 60)
-    print(f" PROBANDO EJERCICIO | NC: {nc} | Método: {NOMBRE_METODO[metodo]}")
-    print(f"=" * 60)
+from profe.config import buscar, obtener_configuracion
+from profe.core import METODOS_MANO, NOMBRE_METODO, elegir, elegir_mano, obtener_rng
+from profe.ui.cuaderno import ORDEN_COLUMNAS, _texto_tabla
 
-    # 1. Obtener generador sembrado
-    rng = obtener_rng(nc, "U2_T2", metodo)
+NC_POR_OMISION = '16330887'
+METODO_POR_OMISION = 'NR'
 
-    # 2. Generar ejercicio aleatorio
-    ej = elegir(metodo, rng)
 
-    print(f"\n📌 TÍTULO: {ej['titulo']}")
-    print(f"🎯 INCÓGNITA: {ej['incognita']} [{ej['unidad']}]")
-    print(f"🚀 VALOR INICIAL (x0): {ej['x0']}")
-    print("\n--- TEXTO QUE VERÁ EL ALUMNO (MARKDOWN) ---")
-    print(ej['contexto'])
-    print("-------------------------------------------\n")
+def id_tarea():
+    """Nombre de la hoja / parte de la semilla, tal como está en config.yaml."""
+    cfg, _ = obtener_configuracion()
+    return buscar(cfg, 'tarea.id', 'U2_T2_Metodos_abiertos')
 
-    # 3. Validar evaluación matemática
-    x0 = ej['x0']
-    f_val = ej['f'](x0)
-    print(f"🧪 PRUEBA MATEMÁTICA: f({x0}) = {f_val:.6f}")
-    if abs(f_val) > 1e10 or math.isnan(f_val):
-        print("⚠️ ADVERTENCIA: La función evaluó un valor numérico inestable.")
-    else:
-        print("✅ Evaluación matemática correcta.")
+
+def probar_ejercicio(nc=NC_POR_OMISION, metodo=METODO_POR_OMISION, mano=False):
+    if metodo not in METODOS_MANO:
+        print('Método desconocido: %r (usa uno de %s)'
+              % (metodo, ', '.join(METODOS_MANO)))
+        return 1
+
+    tarea = id_tarea()
+    partes = (nc, tarea, 'mano', metodo) if mano else (nc, tarea, metodo)
+    rng = obtener_rng(*partes)
+    ej = elegir_mano(metodo, rng) if mano else elegir(metodo, rng)
+
+    print('=' * 68)
+    print(' %s | NC: %s | %s' % (NOMBRE_METODO[metodo], nc,
+                                 'actividad a mano' if mano else 'preguntas automáticas'))
+    print('=' * 68)
+    print('\nTÍTULO   : %s' % ej['titulo'])
+    print('INCÓGNITA: %s [%s]' % (ej.get('incognita', '-'), ej.get('unidad', '-')))
+    arranques = ['x0 = %g' % ej['x0']]
+    if ej.get('x1') is not None:
+        arranques.append('x1 = %g' % ej['x1'])
+    if ej.get('lam') is not None:
+        arranques.append('lambda = %s' % ej['lam'])
+    if ej.get('delta') is not None:
+        arranques.append('delta = %s' % ej['delta'])
+    print('ARRANQUE : %s' % ', '.join(arranques))
+
+    print('\n--- ENUNCIADO QUE VE EL ALUMNO ---')
+    print(ej['contexto'].strip())
+    print('----------------------------------')
+
+    f = ej['f']
+    print('\nf(x0) = %.6g' % f(ej['x0']))
+    print('raíz  = %s   (%s, %d iteraciones con εs = %g %%)'
+          % (('%.8g' % ej['raiz']) if ej['raiz'] is not None else 'None',
+             'converge' if ej['_conv'] else 'NO converge',
+             builtins.len(ej['_filas']), ej['_es']))
+    print('\nTabla de referencia (primeras 5 iteraciones):')
+    print(_texto_tabla(ej['_filas'][:5], ORDEN_COLUMNAS[metodo]))
+    return 0
+
 
 if __name__ == '__main__':
-    # Puedes cambiar el NC para simular diferentes alumnos
-    probar_ejercicio(nc="16330887", metodo="NR")
-    #probar_ejercicio(nc="20330123", metodo="PF")
+    args = [a for a in sys.argv[1:]]
+    nc = args[0] if args else NC_POR_OMISION
+    metodo = args[1].upper() if builtins.len(args) > 1 else METODO_POR_OMISION
+    mano = builtins.len(args) > 2 and args[2].lower().startswith('mano')
+    sys.exit(probar_ejercicio(nc, metodo, mano))

@@ -123,3 +123,27 @@ def iteracion_objetivo(filas, es):
         if fila['ea'] <= es:
             return fila['i']
     return None
+
+
+def resolver(metodo, ej, es=None):
+    """
+    Calcula la tabla de referencia del ejercicio y deja el RESULTADO dentro
+    del propio diccionario:
+
+        ej['_conv']  -> True si la iteración llegó al criterio de paro
+        ej['_filas'] -> la tabla de iteraciones
+        ej['raiz']   -> la raíz de referencia
+        ej['_es']    -> el criterio de paro usado (en %)
+
+    Si la iteración se desboca, el último valor NO es la raíz: cuando el
+    ejercicio conoce su raíz analítica (`raiz_teorica`) se reporta esa.
+    """
+    conv, filas = iteraciones(metodo, ej, es=es)
+    raiz = filas[-1]['x'] if filas else None
+    if not conv and ej.get('raiz_teorica') is not None:
+        raiz = ej['raiz_teorica']
+    ej['_conv'] = conv
+    ej['_filas'] = filas
+    ej['raiz'] = raiz
+    ej['_es'] = ES_DEFECTO if es is None else es
+    return ej

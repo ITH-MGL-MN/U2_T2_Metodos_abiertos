@@ -39,7 +39,7 @@ def generar_semilla(*partes) -> int:
     Genera un entero de 32 bits determinista y reproducible en cualquier plataforma o sesión.
 
     Uso típico:
-        semilla_int = generar_semilla(nc, "U2_T2", "PF")
+        semilla_int = generar_semilla(nc, "U2_T2_Metodos_abiertos")
     """
     texto_unido = '|'.join(str(p) for p in partes)
     digest_hex = hashlib.sha256(texto_unido.encode('utf-8')).hexdigest()

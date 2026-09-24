@@ -1,35 +1,87 @@
+# =====================================================================
+#  Configuración de la tarea U2_T2 — Métodos abiertos
+# ---------------------------------------------------------------------
+#  Todo lo que se ajusta sin tocar código vive aquí: los pesos, las
+#  tolerancias y la URL del webhook. Los enunciados de los ejercicios
+#  están en profe/ejercicios/*.md y los bancos teóricos en preguntas.yaml.
+# =====================================================================
 tarea:
-  id: "U2_T2"
+  # `id` es el nombre de la PESTAÑA en la hoja de cálculo (el Apps Script
+  # escribe ahí) y también la parte que fija la semilla del alumno.
+  id: "U2_T2_Metodos_abiertos"
   nombre: "Unidad 2 - Tarea 2: Métodos Abiertos"
   materia: "Métodos Numéricos"
 
 ponderacion:
-  automatico: 0.9
+  automatico: 0.70
   manual: 0.30
 
 evaluacion:
-  tolerancia_porcentual: 1e-4
-  max_iter_defecto: 100
-  apps_script_url: "https://script.google.com/macros/s/AKfycbwQOF7UOUmIRMAjWI7lekFl_KXDM5KkJPGLk8QNJmPW/dev"
+  tolerancia_simple: 1e-6          # respuestas numéricas (relativa)
+  tolerancia_funcion: 1e-4         # raíz devuelta por las funciones del alumno
+  min_aprobacion: 0.90             # 90 % de los 20 puntos para poder enviar
+  max_iter: 60                     # iteraciones de la tabla de referencia
+  criterios_paro: [0.01, 0.1, 0.001]   # εs (%) que se sortean en las preguntas
+  accion: "guardar"
+  webhook_token: "43f6f220-fc6e-4972-a69e-a11b54a629ec"
+  apps_script_url: "https://script.google.com/macros/s/AKfycbzD5k2BVwJ6pHjBgbc3-f1pbV9zrX0AloZfPiCyHSrsRZ7Kfno6ZQOnqzEbTikVlO6lRQ/exec"
 
+# 14 preguntas = 20 puntos: cada método aporta 1 punto (pregunta de
+# iteraciones) + 2 puntos (programar la función con casos ocultos).
 slots:
   - id: 1
     tipo: "teorica"
     banco: "INTRO"
-    peso: 10
+    peso: 1
   - id: 2
     tipo: "ejercicio_num"
     metodo: "PF"
-    peso: 20
+    peso: 1
   - id: 3
-    tipo: "ejercicio_num"
-    metodo: "NR"
-    peso: 20
+    tipo: "funcion"
+    metodo: "PF"
+    peso: 2
   - id: 4
     tipo: "ejercicio_num"
-    metodo: "SEC"
-    peso: 20
+    metodo: "PFM"
+    peso: 1
   - id: 5
+    tipo: "funcion"
+    metodo: "PFM"
+    peso: 2
+  - id: 6
+    tipo: "ejercicio_num"
+    metodo: "NR"
+    peso: 1
+  - id: 7
+    tipo: "funcion"
+    metodo: "NR"
+    peso: 2
+  - id: 8
+    tipo: "ejercicio_num"
+    metodo: "NRM"
+    peso: 1
+  - id: 9
+    tipo: "funcion"
+    metodo: "NRM"
+    peso: 2
+  - id: 10
+    tipo: "ejercicio_num"
+    metodo: "SEC"
+    peso: 1
+  - id: 11
+    tipo: "funcion"
+    metodo: "SEC"
+    peso: 2
+  - id: 12
+    tipo: "ejercicio_num"
+    metodo: "SM"
+    peso: 1
+  - id: 13
+    tipo: "funcion"
+    metodo: "SM"
+    peso: 2
+  - id: 14
     tipo: "teorica"
     banco: "CONCL"
-    peso: 10
+    peso: 1

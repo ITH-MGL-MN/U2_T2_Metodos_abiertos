@@ -55,7 +55,7 @@ class InterfazTarea(object):
         if tipo == 'opcion':
             control = widgets.RadioButtons(
                 options=p['opciones'],
-                value=None,
+                index=None,
                 layout=widgets.Layout(width="100%")
             )
         elif tipo == 'simple':
@@ -90,10 +90,12 @@ class InterfazTarea(object):
         for idx, (tipo, ctrl) in self.controles.items():
             if tipo == 'opcion':
                 val = ctrl.value
-                if val:
-                    # Convertir 'a) ...' -> 0, 'b) ...' -> 1, etc.
-                    letra = val.strip().lower()
-                    respuestas[idx] = float(ord(letra) - 97)
+                if val is not None:
+                    # 'a) ...' -> 0, 'b) ...' -> 1, ... (o el índice, si ya es número)
+                    if isinstance(val, (int, float)):
+                        respuestas[idx] = float(val)
+                    else:
+                        respuestas[idx] = float(ord(str(val).strip().lower()[0]) - 97)
             elif tipo == 'simple':
                 val = ctrl.value.strip()
                 if val:
@@ -155,4 +157,11 @@ class InterfazTarea(object):
 
             # Intentar envío a Google Sheets por Apps Script
             print("\nEnviando calificación a la hoja de registro oficial...")
-            self.tarea.enviar(respuestas, self.marco)
+            res = self.tarea.enviar(respuestas, self.marco)
+            if res.get('motivo') == 'minimo':
+                print('\u26d4 A\u00fan no puedes enviar: necesitas al menos %g %% (%g puntos).'
+                      % (res['minimo'], self.tarea.min_aprobacion * res['maximo']))
+            elif res['enviado']:
+                print('\u2705 Enviado. Respuesta del servidor: %s' % res['respuesta'][:300])
+            else:
+                print('\u26a0\ufe0f No se pudo enviar: %s' % res.get('error'))

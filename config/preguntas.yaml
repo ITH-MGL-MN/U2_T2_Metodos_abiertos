@@ -1,21 +1,96 @@
+# =====================================================================
+#  Bancos teóricos (opción múltiple)
+# ---------------------------------------------------------------------
+#  `correcta` es el índice (0 = la primera opción listada) de la opción
+#  buena. El motor baraja las opciones y reetiqueta a) b) c) d), así que
+#  la letra que ve el alumno NO es la de este archivo.
+#  INTRO -> pregunta 1 · CONCL -> pregunta 14
+# =====================================================================
 INTRO:
   - id: "intro_01"
-    titulo: "Naturaleza de los Métodos Abiertos"
-    pregunta: "A diferencia de los métodos cerrados, los métodos abiertos:"
+    titulo: "Limitacion de los metodos abiertos"
+    pregunta: >-
+      Los metodos **abiertos** (punto fijo, Newton-Raphson, secante) tienen una gran
+      ventaja de velocidad frente a los cerrados (biseccion, falsa posicion).
+      **¿Cual es su principal desventaja?**
     opciones:
-      - "a) Garantizan siempre la convergencia a la raíz."
-      - "b) Requieren un intervalo [a, b] donde f(a)*f(b) < 0."
-      - "c) Usan uno o dos valores iniciales y pueden divergir si la estimación es lejana."
-      - "d) Solo funcionan con polinomios de grado par."
-    correcta: 2
+      - "a) Porque no necesitan derivadas ni dos puntos, pero pueden **no converger**"
+      - "b) Porque siempre convergen mas rapido que Newton-Raphson"
+      - "c) Porque no requieren ningun valor inicial"
+      - "d) Porque dan la raiz exacta en una sola iteracion"
+    correcta: 0
+
+  - id: "intro_02"
+    titulo: "Que aporta un metodo abierto"
+    pregunta: >-
+      En el problema de la tuberia (Colebrook) no es facil encontrar un intervalo con
+      cambio de signo, pero si se tiene una buena estimacion inicial.
+      **¿Que requisito elimina un metodo abierto?**
+    opciones:
+      - "a) No requiere que $f$ cambie de signo en un intervalo: basta un valor inicial"
+      - "b) Necesita que $f(a)f(b)<0$"
+      - "c) Necesita evaluar $f$ muchas mas veces"
+      - "d) Solo funciona con polinomios"
+    correcta: 0
+
+  - id: "intro_03"
+    titulo: "Abierto vs cerrado"
+    pregunta: >-
+      Para $f(c)=\\frac{g m}{c}\\left(1-e^{-ct/m}\\right)-v=0$ (paracaidista) se compara
+      biseccion contra Newton-Raphson partiendo de la misma estimacion. **¿Que esperas?**
+    opciones:
+      - "a) El metodo abierto suele necesitar **muchas menos** evaluaciones"
+      - "b) El metodo cerrado es siempre mas preciso"
+      - "c) Los dos necesitan el mismo numero de iteraciones"
+      - "d) El metodo abierto garantiza la convergencia"
+    correcta: 0
+
+  - id: "intro_04"
+    titulo: "Cuando falla un metodo abierto"
+    pregunta: >-
+      Un companero afirma que "si el metodo es abierto, siempre converge".
+      **¿Cual es la respuesta correcta?**
+    opciones:
+      - "a) Puede fallar por una mala estimacion inicial o por $f'(x)=0$"
+      - "b) Siempre converge si la funcion es continua"
+      - "c) Solo falla si la funcion es un polinomio"
+      - "d) Nunca requiere criterio de paro"
+    correcta: 0
 
 CONCL:
   - id: "concl_01"
-    titulo: "Criterio de Selección de Algoritmos"
-    pregunta: "Si necesitas programar un algoritmo en un microcontrolador donde la derivada analítica f'(x) es muy compleja de calcular, ¿qué método abierto es el más recomendable?"
+    titulo: "Decision de firmware"
+    pregunta: >-
+      Debes resolver $f(T)=0$ cada 10 ms dentro del firmware de un controlador.
+      **No** puedes garantizar un intervalo con cambio de signo, la derivada analitica no
+      esta disponible y solo tienes una estimacion inicial razonable. **¿Que metodo eliges?**
     opciones:
-      - "a) Newton-Raphson Estándar"
-      - "b) Método de la Secante o Secante Modificada"
-      - "c) Bisección"
-      - "d) Regula Falsi"
-    correcta: 1
+      - "a) Secante modificada: un solo valor inicial y no requiere derivadas"
+      - "b) Newton-Raphson: necesita la derivada analitica"
+      - "c) Punto fijo: hay que construir un despeje distinto para cada sensor"
+      - "d) Biseccion: exige un intervalo con cambio de signo"
+    correcta: 0
+
+  - id: "concl_02"
+    titulo: "Decision de firmware (precision)"
+    pregunta: >-
+      Necesitas 12 digitos correctos, la funcion es suave y **si** puedes programar la
+      derivada analitica. **¿Que metodo conviene?**
+    opciones:
+      - "a) Newton-Raphson: convergencia cuadratica (duplica los digitos correctos)"
+      - "b) Punto fijo: siempre es el mas rapido"
+      - "c) Biseccion: es el unico que da precision"
+      - "d) Secante modificada: es de orden 3"
+    correcta: 0
+
+  - id: "concl_03"
+    titulo: "Decision de firmware (despeje rebelde)"
+    pregunta: >-
+      Tu despeje cumple $|g'(x^*)|=1.4>1$ y la iteracion oscila y crece.
+      **¿Que haces?**
+    opciones:
+      - "a) Aplicar sub-relajacion con $\\lambda$ que cumpla $|1+\\lambda(g'-1)|<1$"
+      - "b) Aumentar $\\lambda$ hasta 3 para acelerar"
+      - "c) Cambiar de raiz"
+      - "d) Nada: si $|g'|>1$ el metodo converge igual"
+    correcta: 0

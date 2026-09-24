@@ -22,7 +22,6 @@
 =========================================================================
 """
 import builtins
-import importlib.util
 import os
 import sys
 
@@ -51,11 +50,11 @@ def aviso(msg):
 
 
 def cargar():
-    ruta = os.path.join(RAIZ, 'profe', 'grader.py')
-    spec = importlib.util.spec_from_file_location('grader_u2t2', ruta)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+    """Importa la fachada del motor (`profe/grader.py`) como módulo."""
+    if RAIZ not in sys.path:
+        sys.path.insert(0, RAIZ)
+    import profe.grader
+    return profe.grader
 
 
 def d1(fn, x, h=1e-6):
@@ -82,7 +81,7 @@ def parte1(g, rng_semilla=20260918):
             for k, fab in enumerate(fabricas[metodo]):
                 rng = np.random.default_rng(rng_semilla + 7 * k)
                 try:
-                    ej = g._con_raiz(metodo, fab(rng))
+                    ej = g.resolver(metodo, fab(rng))
                 except Exception as exc:            # noqa: BLE001
                     fallo('%s/%s#%d: la fabrica lanzo %r' % (etiqueta, metodo, k, exc))
                     continue

@@ -10,6 +10,8 @@ __pycache__/
 #U2_T2_Metodos_abiertos.ipynb
 Info metodos.md
 README.md
+# Bundle legible: es una copia del motor, se genera con tools/build.py.
+grader_local.py
 
 # --- Sistema ---
 .DS_Store

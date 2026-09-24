@@ -95,6 +95,16 @@ def main():
     print('Celdas: %d  (%d de codigo)' % (len(celdas),
                                           builtins.sum(1 for c in celdas if _tipo(c) == 'code')))
 
+    # El cuaderno carga el motor de uno de estos dos archivos. Si falta el que
+    # toca, no tiene sentido seguir: los errores saldrian como si el cuaderno
+    # estuviera mal escrito.
+    motor = 'grader_ofuscado.txt' if forzar_ofuscado else 'grader_local.py'
+    if not os.path.exists(os.path.join(RAIZ, motor)):
+        print('   [FALLA] no existe %s en %s' % (motor, RAIZ))
+        print('   Genera el bundle con:  python tools/build.py')
+        return 1
+    print('Motor esperado : %s' % motor)
+
     # ---- 1) compilacion de todas las celdas de codigo ----
     fallos_comp = []
     for k, c in enumerate(celdas):
@@ -185,7 +195,11 @@ def main():
         # El alumno perfecto tambien contesta bien los reactivos de opcion
         # y los numericos: llenamos los widgets con la solucion correcta.
         _ex = ns.get('_EXAMEN')
-        if _ex is not None:
+        if _ex is None:
+            # Sin motor cargado todo lo demas seria un falso OK.
+            print('   [FALLA] el motor no creo la tarea: el cuaderno no cargo.')
+            errores.append((-1, Exception('el motor no cargo (_EXAMEN is None)'), ''))
+        else:
             for j, (p, sol) in enumerate(zip(_ex.preguntas, _ex.soluciones), 1):
                 w = ns.get('resp_%d' % j)
                 if w is not None and sol is not None:
@@ -194,20 +208,18 @@ def main():
                     except (TypeError, ValueError):
                         pass
 
-        buf = io.StringIO()
-        with redirect_stdout(buf):
-            puntos, maximo = ns['calificar'](Marco(ns))
-        print('   Puntos del alumno perfecto: %g / %g' % (puntos, maximo))
-        if abs(puntos - maximo) > 1e-9:
-            print('   [FALLA] un alumno perfecto NO saca el total.')
-            errores.append((-1, Exception('experto < total'), ''))
-        else:
-            print('   OK: el examen se puede responder al 100%% con el temario.')
-        if not ns.get('_MANO'):
-            print('   [aviso] la hoja manual quedo vacia (revisa mano_comprueba).')
-        nb2 = {'pf': 0, 'pfm': 0, 'nr': 0, 'nrm': 0, 'secante': 0, 'secmod': 0}
-        _ex = ns.get('_EXAMEN')
-        if _ex is not None:
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                puntos, maximo = ns['calificar'](Marco(ns))
+            print('   Puntos del alumno perfecto: %g / %g' % (puntos, maximo))
+            if abs(puntos - maximo) > 1e-9:
+                print('   [FALLA] un alumno perfecto NO saca el total.')
+                errores.append((-1, Exception('experto < total'), ''))
+            else:
+                print('   OK: el examen se puede responder al 100% con el temario.')
+            if not ns.get('_MANO'):
+                print('   [aviso] la hoja manual quedo vacia (revisa mano_comprueba).')
+            nb2 = {'pf': 0, 'pfm': 0, 'nr': 0, 'nrm': 0, 'secante': 0, 'secmod': 0}
             for p in _ex.preguntas:
                 if p['tipo'] == 'funcion':
                     nb2[p['funcion']] = nb2.get(p['funcion'], 0) + 1

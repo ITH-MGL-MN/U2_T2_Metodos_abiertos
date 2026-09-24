@@ -1,10 +1,17 @@
 # -*- coding: utf-8 -*-
 """
-profe/ejercicios/modelos.py — Modelos matemáticos de los ejercicios.
+profe/core/modelos.py — Modelos matemáticos de los ejercicios.
+
+Cada fábrica sortea sus datos con el RNG del alumno (a través de los rangos
+declarados en `profe/ejercicios/<nombre>.md`) y devuelve un diccionario con
+`f`, `df`, `ddf`, `g`, `dg`, el punto de arranque `x0`/`x1`, `lam`, `delta`
+y el texto del enunciado. La tabla de iteraciones y la raíz las añade
+`profe.core.solvers.resolver()` al seleccionar el ejercicio.
 """
 import math
 import builtins
-from profe.core.markdown_loader import cargar_ejercicio_md
+from profe.core.helpers import _fmt
+from profe.core.markdown_loader import cargar_ejercicio_md, sustituir
 
 def _ej_paracaidista(rng):
     meta, ctx, d = cargar_ejercicio_md('paracaidista.md', rng)
@@ -47,7 +54,8 @@ def _ej_maldespeje(rng):
     def dgfun(x): return x
 
     return {**meta, 'contexto': ctx, 'f': f, 'df': df, 'ddf': ddf, 'g': gfun, 'dg': dgfun,
-            'x0': x0, 'x1': None, 'lam': None, 'delta': None, 'datos': [('ecuacion', 0, '-')]}
+            'x0': x0, 'x1': None, 'lam': None, 'delta': None, 'datos': [('ecuacion', 0, '-')],
+            'diverge': True, 'par': ((x0 * x0 - 3.0) / 2.0, 3.0), 'raiz_teorica': 3.0}
 
 def _ej_oscilatoria(rng):
     meta, ctx, d = cargar_ejercicio_md('oscilatoria.md', rng)
@@ -116,6 +124,8 @@ def _ej_doble(rng):
     s = d['s']
     r = s + d['r_off']
     x0 = r + d['x0_off']
+    # `r` y `x0` no se sortean: se calculan aquí, así que los completamos ahora.
+    ctx = sustituir(ctx, r=_fmt(r, 1), x0=_fmt(x0, 2))
 
     def f(x): return (x - r)**2 * (x - s)
     def df(x): return (x - r) * (3.0 * x - (2.0 * s + r))
