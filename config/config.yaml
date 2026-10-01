@@ -26,61 +26,64 @@ evaluacion:
   webhook_token: "43f6f220-fc6e-4972-a69e-a11b54a629ec"
   apps_script_url: "https://script.google.com/macros/s/AKfycbzD5k2BVwJ6pHjBgbc3-f1pbV9zrX0AloZfPiCyHSrsRZ7Kfno6ZQOnqzEbTikVlO6lRQ/exec"
 
-# 14 preguntas = 20 puntos: cada método aporta 1 punto (pregunta de
-# iteraciones) + 2 puntos (programar la función con casos ocultos).
+# 14 preguntas = 20 puntos: cada método aporta 2 puntos (programar la función
+# con casos ocultos) + 1 punto (pregunta de iteraciones sobre esa misma
+# función). El código va PRIMERO: la pregunta de iteraciones se contesta
+# ejecutando la función que el alumno acaba de escribir, no contando a mano
+# (la actividad a mano solo pide las 3 primeras iteraciones).
 slots:
   - id: 1
     tipo: "teorica"
     banco: "INTRO"
     peso: 1
   - id: 2
-    tipo: "ejercicio_num"
+    tipo: "funcion"
     metodo: "PF"
-    peso: 1
+    peso: 2
   - id: 3
-    tipo: "funcion"
+    tipo: "ejercicio_num"
     metodo: "PF"
-    peso: 2
+    peso: 1
   - id: 4
-    tipo: "ejercicio_num"
+    tipo: "funcion"
     metodo: "PFM"
-    peso: 1
+    peso: 2
   - id: 5
-    tipo: "funcion"
+    tipo: "ejercicio_num"
     metodo: "PFM"
-    peso: 2
+    peso: 1
   - id: 6
-    tipo: "ejercicio_num"
+    tipo: "funcion"
     metodo: "NR"
-    peso: 1
+    peso: 2
   - id: 7
-    tipo: "funcion"
+    tipo: "ejercicio_num"
     metodo: "NR"
-    peso: 2
+    peso: 1
   - id: 8
-    tipo: "ejercicio_num"
+    tipo: "funcion"
     metodo: "NRM"
-    peso: 1
+    peso: 2
   - id: 9
-    tipo: "funcion"
+    tipo: "ejercicio_num"
     metodo: "NRM"
-    peso: 2
+    peso: 1
   - id: 10
-    tipo: "ejercicio_num"
+    tipo: "funcion"
     metodo: "SEC"
-    peso: 1
+    peso: 2
   - id: 11
-    tipo: "funcion"
+    tipo: "ejercicio_num"
     metodo: "SEC"
-    peso: 2
+    peso: 1
   - id: 12
+    tipo: "funcion"
+    metodo: "SM"
+    peso: 2
+  - id: 13
     tipo: "ejercicio_num"
     metodo: "SM"
     peso: 1
-  - id: 13
-    tipo: "funcion"
-    metodo: "SM"
-    peso: 2
   - id: 14
     tipo: "teorica"
     banco: "CONCL"

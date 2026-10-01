@@ -3,7 +3,9 @@
 profe/core/evaluator.py — Motor de generación, calificación y envío de la tarea.
 
 Los slots (cuántas preguntas, de qué tipo y con qué peso) y las tolerancias
-viven en `config/config.yaml`; los bancos teóricos en `config/preguntas.yaml`.
+viven en `config/config.yaml`; los bancos teóricos en `config/preguntas.yaml`
+y los TEXTOS de las preguntas de cada método en `profe/evaluador/<metodo>.md`
+(con el mismo formato que los enunciados de `profe/ejercicios/`).
 Todo lo que depende del alumno se sortea con una semilla derivada de su número
 de control, así que su tarea es reproducible.
 """
@@ -17,6 +19,7 @@ import numpy as np
 from profe.config import buscar, obtener_configuracion
 from profe.core import NOMBRE_FUNCION, NOMBRE_METODO, elegir, elegir_mano
 from profe.core.helpers import _fmt
+from profe.core.markdown_loader import cargar_pregunta_md, sustituir
 from profe.core.seed import extraer_nc, obtener_rng
 from profe.core.solvers import iteracion_objetivo
 
@@ -137,15 +140,14 @@ class Tarea(object):
             if k is None:
                 # Respaldo: con un ejercicio convergente no debería llegar aquí.
                 k = builtins.min(builtins.len(filas), 3) or 3
-            texto = (
-                'Con el criterio de paro $\\varepsilon_s=%s\\%%$, revisa la tabla de '
-                'iteraciones del ejercicio de arriba (el mismo de **tu actividad a '
-                'mano**) y contesta: **¿en qué iteración el error aproximado '
-                '$\\varepsilon_a$ queda por primera vez por debajo de '
-                '$\\varepsilon_s$?**\n\n'
-                'Escribe solo el número entero de la iteración (por ejemplo `4`).'
-                % _fmt(es, 4)
-            )
+            # εs viene en %; la función del alumno lo quiere en fracción.
+            tol_txt = '%.0e' % (es / 100.0)
+            meta, _ = _ficha(metodo)
+            _, texto = cargar_pregunta_md(
+                'iteraciones.md',
+                es=_fmt(es, 4),
+                tol=tol_txt,
+                ejemplo=sustituir(meta.get('ejemplo', ''), tol=tol_txt))
             p = {
                 'titulo': 'Iteraciones: %s' % NOMBRE_METODO.get(metodo, metodo),
                 'tipo': 'simple',
@@ -157,8 +159,10 @@ class Tarea(object):
             }
             return p, float(k)
 
-        opciones, correcta = _concepto_metodo(metodo)
-        opciones = _reordenar(opciones, correcta, self.rng)
+        meta, _ = _ficha(metodo)
+        concepto = meta.get('concepto') or {}
+        opciones = _reordenar(list(concepto.get('opciones') or []),
+                              int(concepto.get('correcta', 0)), self.rng)
         p = {
             'titulo': 'Concepto: %s' % NOMBRE_METODO.get(metodo, metodo),
             'tipo': 'opcion',
@@ -170,15 +174,15 @@ class Tarea(object):
 
     def _generar_funcion_oculta(self, metodo):
         """Pregunta de programación: la función se prueba con casos ocultos."""
+        meta, texto = _ficha(metodo)
         casos = _casos_func(metodo, self.rng)
-        firma, texto = _texto_func(metodo)
         p = {
             'titulo': 'Programa: %s' % NOMBRE_METODO.get(metodo, metodo),
             'tipo': 'funcion',
-            'funcion': NOMBRE_FUNCION[metodo],
+            'funcion': meta['funcion'],
             'texto': texto,
             'casos': casos,
-            'firma': firma,
+            'firma': meta['firma'],
         }
         return p, None
 
@@ -313,8 +317,12 @@ class Tarea(object):
             resultado['motivo'] = 'minimo'
             return resultado
 
-        # El Apps Script espera el nombre de la HOJA en `tarea` y el token
-        # compartido; el resto son los puntos y la identificación del alumno.
+        # El Apps Script (doPost.gs -> procesarTarea) no se fía del resumen:
+        # exige `respuestas` (el PUNTAJE de cada pregunta), `pesos` y
+        # `maxPuntos`, y con eso reconstruye las columnas R1..Rn y el total
+        # escalado a 100. Sin `respuestas` responde
+        #   {"status":"error","message":"Las respuestas deben ser un arreglo..."}
+        # y NO guarda nada en la hoja.
         cuerpo = {
             'token': self.token,
             'accion': self.accion,
@@ -324,6 +332,9 @@ class Tarea(object):
             'calificacion': builtins.round(calif, 1),
             'automatico': builtins.round(puntos, 2),
             'maximo': maximo,
+            'respuestas': [builtins.round(f['puntos'], 4) for f in filas],
+            'pesos': list(self.pesos),
+            'maxPuntos': builtins.max(self.pesos) if self.pesos else 2,
         }
         resultado['cuerpo'] = cuerpo
 
@@ -336,7 +347,20 @@ class Tarea(object):
             headers={'Content-Type': 'text/plain;charset=utf-8'})
         try:
             with urllib.request.urlopen(pet, timeout=30) as resp:
-                resultado['respuesta'] = resp.read().decode('utf-8', 'replace')
+                texto = resp.read().decode('utf-8', 'replace')
+            resultado['respuesta'] = texto
+            # El Apps Script contesta 200 aunque RECHAZE el envío, así que hay
+            # que mirar el cuerpo: si trae status=error, no se guardó nada.
+            try:
+                aviso = json.loads(texto)
+            except ValueError:
+                aviso = None
+            resultado['aviso'] = aviso
+            if isinstance(aviso, dict) and str(aviso.get('status', '')).lower() == 'error':
+                resultado['enviado'] = False
+                resultado['motivo'] = 'servidor'
+                resultado['error'] = aviso.get('message', texto)
+            else:
                 resultado['enviado'] = True
         except Exception as exc:                            # noqa: BLE001
             resultado['motivo'] = 'red'
@@ -371,109 +395,62 @@ def _reordenar(opciones, idx_correcta, rng):
             for j, texto in enumerate(cuerpos)]
 
 
+# =====================================================================
+#  FICHAS DE LOS MÉTODOS (profe/evaluador/<metodo>.md)
+#
+#  Cada método tiene su archivo con el MISMO formato que los enunciados de
+#  profe/ejercicios/: frontmatter (nombre de la función, firma exacta,
+#  llamada de ejemplo y las opciones del concepto) y cuerpo con el texto que
+#  lee el alumno. Así el profesor edita las preguntas sin tocar Python.
+#
+#  El ejemplo de llamada se usa en la pregunta de iteraciones: la tabla para
+#  con εs **en por ciento**, pero las funciones del alumno reciben `tol` **en
+#  fracción** (`tol = εs / 100`), y ese valor reproduce EXACTAMENTE la misma
+#  iteración que la tabla (verificado con los 40 NC, los 6 métodos y los 3
+#  criterios de paro). El nombre de la variable (`EJ_PF`, `EJ_PFM`, ...) es el
+#  que usa el cuaderno en la sección de cada método.
+# =====================================================================
+ARCHIVO_FICHA = {
+    'PF':  'pf.md',
+    'PFM': 'pfm.md',
+    'NR':  'nr.md',
+    'NRM': 'nrm.md',
+    'SEC': 'sec.md',
+    'SM':  'sm.md',
+}
+
+_FICHAS = {}
+
+
+def _ficha(metodo):
+    """`(meta, texto)` de la pregunta de programación del método."""
+    if metodo not in _FICHAS:
+        archivo = ARCHIVO_FICHA.get(metodo)
+        if archivo is None:
+            raise ValueError('Método desconocido: %r' % (metodo,))
+        meta, texto = cargar_pregunta_md(archivo)
+        # El nombre de la función es el que declara el cuaderno: si el .md y el
+        # registro no coinciden, la pregunta se calificaría sola en el vacío.
+        esperado = NOMBRE_FUNCION.get(metodo)
+        if meta.get('funcion') != esperado:
+            raise ValueError('profe/evaluador/%s declara la funcion %r pero '
+                             'NOMBRE_FUNCION dice %r'
+                             % (archivo, meta.get('funcion'), esperado))
+        _FICHAS[metodo] = (meta, texto)
+    return _FICHAS[metodo]
+
+
 def _concepto_metodo(metodo):
     """(opciones, índice de la correcta) — la correcta siempre va primero."""
-    if metodo == 'PF':
-        return (['a) La iteracion $x_{i+1}=g(x_i)$ converge si $|g\'(x)|<1$ en la raiz',
-                 'b) Converge siempre, sin importar la forma del despeje $g$',
-                 'c) Converge solo si $f(a)f(b)<0$',
-                 'd) Requiere dos puntos iniciales'], 0)
-    if metodo == 'PFM':
-        return (['a) La sub-relajacion ($0<\\lambda<1$) puede estabilizar un despeje que oscila',
-                 'b) Siempre aumenta el numero de iteraciones',
-                 'c) $\\lambda$ debe ser mayor que 2 para converger',
-                 'd) Cambia la raiz del problema'], 0)
-    if metodo == 'NR':
-        return (['a) Convergencia cuadratica: el numero de digitos correctos se duplica cada iteracion',
-                 'b) Convergencia lineal, del mismo orden que biseccion',
-                 'c) No necesita la derivada $f\'$',
-                 'd) Nunca falla, sin importar $f\'$'], 0)
-    if metodo == 'NRM':
-        return (['a) En una raiz multiple $f\'(x^*)=0$ y Newton-Raphson se vuelve lento (lineal)',
-                 'b) Newton-Raphson es mas rapido en raices multiples',
-                 'c) La raiz multiple no existe',
-                 'd) El metodo modificado solo sirve para polinomios de grado 2'], 0)
-    if metodo == 'SEC':
-        return (['a) Orden de convergencia $\\approx1.618$ (superlineal) y no usa la derivada',
-                 'b) Conserva el cambio de signo como la falsa posicion',
-                 'c) Convergencia cuadratica, igual que Newton',
-                 'd) Necesita que $f(x_{i-1})=f(x_i)$'], 0)
-    if metodo == 'SM':
-        return (['a) Si $\\delta$ es demasiado pequeno el cociente sufre error de cancelacion',
-                 'b) $\\delta$ debe ser exactamente la derivada',
-                 'c) El metodo necesita dos puntos iniciales',
-                 'd) $\\delta$ no influye en el resultado'], 0)
-    raise ValueError('Método desconocido: %r' % (metodo,))
+    meta, _ = _ficha(metodo)
+    concepto = meta.get('concepto') or {}
+    return (list(concepto.get('opciones') or []), int(concepto.get('correcta', 0)))
 
 
 def _texto_func(metodo):
     """(firma exacta, enunciado) de la pregunta de programación."""
-    if metodo == 'PF':
-        return ('pf(g, x0, tol=1e-6, max_iter=100)', (
-            'Programa la **iteracion de punto fijo** en una funcion llamada `pf`.\n\n'
-            '**Firma exacta** (respeta el nombre y el orden de los argumentos):\n\n'
-            '```python\n'
-            'def pf(g, x0, tol=1e-6, max_iter=100):\n'
-            '    """Devuelve (raiz, n_iteraciones)."""\n'
-            '```\n\n'
-            '`g` es una funcion de una variable, `x0` el valor inicial y `tol` el criterio '
-            'de paro **sobre el error relativo aproximado** '
-            '$\\varepsilon_a=\\left|\\frac{x_{i+1}-x_i}{x_{i+1}}\\right|$ (expresado en '
-            '**fraccion**, no en porciento: `tol=1e-6` = 1e-4 %).\n\n'
-            'Devuelve una **tupla** `(raiz, n_iteraciones)`. Se probara con funciones '
-            'ocultas, asi que no sirve escribir un resultado fijo.'))
-    if metodo == 'PFM':
-        return ('pfm(g, x0, lam, tol=1e-6, max_iter=100)', (
-            'Programa el **punto fijo con relajacion** en `pfm`.\n\n'
-            '```python\n'
-            'def pfm(g, x0, lam, tol=1e-6, max_iter=100):\n'
-            '    """x_{i+1} = lam*g(x_i) + (1-lam)*x_i. Devuelve (raiz, n_iter)."""\n'
-            '```\n\n'
-            'Es decir $x_{i+1}=\\lambda\\,g(x_i)+(1-\\lambda)x_i$. Con `lam=1` debe ser '
-            'identico a `pf`. Criterio de paro igual que en `pf` (error relativo '
-            'aproximado en fraccion). Devuelve `(raiz, n_iteraciones)`.'))
-    if metodo == 'NR':
-        return ('nr(f, df, x0, tol=1e-6, max_iter=100)', (
-            'Programa **Newton-Raphson** en `nr`.\n\n'
-            '```python\n'
-            'def nr(f, df, x0, tol=1e-6, max_iter=100):\n'
-            '    """x_{i+1} = x_i - f(x_i)/f\'(x_i). Devuelve (raiz, n_iter)."""\n'
-            '```\n\n'
-            '`df` es la derivada de `f`. Criterio de paro: error relativo aproximado '
-            'en fraccion. Devuelve `(raiz, n_iteraciones)`. Debe proteger el caso '
-            '$f\'(x_i)=0$ (evita la division entre cero).'))
-    if metodo == 'NRM':
-        return ('nrm(f, df, ddf, x0, tol=1e-6, max_iter=100)', (
-            'Programa **Newton-Raphson modificado** (formula de Ralston-Rabinowitz) '
-            'para raices multiples en `nrm`.\n\n'
-            '```python\n'
-            'def nrm(f, df, ddf, x0, tol=1e-6, max_iter=100):\n'
-            '    """x_{i+1} = x_i - f f\' / ( (f\')^2 - f f\'\' ). Devuelve (raiz, n_iter)."""\n'
-            '```\n\n'
-            '`df` y `ddf` son la primera y la segunda derivada de `f`. Criterio de paro: '
-            'error relativo aproximado en fraccion. Devuelve `(raiz, n_iteraciones)`. '
-            'Protege el denominador nulo.'))
-    if metodo == 'SEC':
-        return ('secante(f, x0, x1, tol=1e-6, max_iter=100)', (
-            'Programa el metodo de la **secante** en `secante`.\n\n'
-            '```python\n'
-            'def secante(f, x0, x1, tol=1e-6, max_iter=100):\n'
-            '    """x_{i+1} = x_i - f(x_i)(x_{i-1}-x_i)/(f(x_{i-1})-f(x_i))."""\n'
-            '```\n\n'
-            'Parte de **dos** valores iniciales `x0`, `x1`. Criterio de paro: error '
-            'relativo aproximado en fraccion. Devuelve `(raiz, n_iteraciones)`. '
-            'Si `f(x0) == f(x1)` debes evitar la division entre cero.'))
-    if metodo == 'SM':
-        return ('secmod(f, x0, delta=0.01, tol=1e-6, max_iter=100)', (
-            'Programa la **secante modificada** en `secmod`.\n\n'
-            '```python\n'
-            'def secmod(f, x0, delta=0.01, tol=1e-6, max_iter=100):\n'
-            '    """x_{i+1} = x_i - delta*f(x_i)/(f(x_i+delta)-f(x_i))."""\n'
-            '```\n\n'
-            'Usa un **solo** valor inicial y aproxima la derivada con el incremento '
-            '`delta`. Criterio de paro: error relativo aproximado en fraccion. '
-            'Devuelve `(raiz, n_iteraciones)`. Evita dividir entre cero.'))
-    raise ValueError('Método desconocido: %r' % (metodo,))
+    meta, texto = _ficha(metodo)
+    return meta['firma'], texto
 
 
 # =====================================================================

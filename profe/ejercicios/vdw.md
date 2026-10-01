@@ -13,4 +13,8 @@ Se almacena $\text{CO}_2$ a **$T = {T}\text{ K}$** y **$p = {p}\text{ atm}$**. L
 
 $$\left(p + \frac{a}{v^2}\right)(v - b) = R T$$
 
-con $a = 3.592$, $b = 0.04267$ y $R = 0.08206$. Obtén el volumen molar $v$ partiendo del valor ideal $v_0 = R T / p$.
+con $a = 3.592$, $b = 0.04267$ y $R = 0.08206$. Pasando todo a un lado, se resuelve
+
+$$f(v) = \left(p + \frac{a}{v^2}\right)(v - b) - R T = 0.$$
+
+Obtén el volumen molar $v$ partiendo del valor ideal $v_0 = R T / p$.

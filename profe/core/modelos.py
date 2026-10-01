@@ -13,16 +13,30 @@ import builtins
 from profe.core.helpers import _fmt
 from profe.core.markdown_loader import cargar_ejercicio_md, sustituir
 
+def _paracaidista_modelo(m, t, v, grav=9.81):
+    """
+    Modelo del paracaidista para UN juego de datos (m, t, v).
+
+    Devuelve `(f, df, ddf, g, dg)`:
+      * `f(c) = (grav*m/c)*(1 - e^{-c t/m}) - v`  -> la ley fisica igualada a 0
+      * `g(c) = (grav*m/v)*(1 - e^{-c t/m})`      -> el despeje, con g(c) - c = (c/v)*f(c)
+      * `df`, `ddf` son las derivadas DE `f` (Newton / Newton modificado)
+      * `dg` es la derivada DE `g` (solo para el criterio |g'| < 1)
+
+    Lo comparten `_ej_paracaidista` y `_ej_paracaidista_relax` para que el
+    texto del enunciado y las funciones usen SIEMPRE los mismos numeros.
+    """
+    def f(c): return (grav * m / c) * (1.0 - math.exp(-c * t / m)) - v
+    def df(c): return (grav * m / (c**2)) * (math.exp(-c * t / m) * (1.0 + c * t / m) - 1.0)
+    def ddf(c): return (df(c + 1e-5) - df(c - 1e-5)) / 2e-5
+    def gfun(c): return (grav * m / v) * (1.0 - math.exp(-c * t / m))
+    def dgfun(c): return (grav * t / v) * math.exp(-c * t / m)
+    return f, df, ddf, gfun, dgfun
+
 def _ej_paracaidista(rng):
     meta, ctx, d = cargar_ejercicio_md('paracaidista.md', rng)
-    m, t, v, g = d['m'], d['t'], d['v'], 9.81
-    x0 = d['x0']
-
-    def f(c): return (g * m / c) * (1.0 - math.exp(-c * t / m)) - v
-    def df(c): return (g * m / (c**2)) * (math.exp(-c * t / m) * (1.0 + c * t / m) - 1.0)
-    def ddf(c): return (df(c + 1e-5) - df(c - 1e-5)) / 2e-5
-    def gfun(c): return (g * m / v) * (1.0 - math.exp(-c * t / m))
-    def dgfun(c): return (g * t / v) * math.exp(-c * t / m)
+    m, t, v, x0 = d['m'], d['t'], d['v'], d['x0']
+    f, df, ddf, gfun, dgfun = _paracaidista_modelo(m, t, v)
 
     return {**meta, 'contexto': ctx, 'f': f, 'df': df, 'ddf': ddf, 'g': gfun, 'dg': dgfun,
             'x0': x0, 'x1': x0 + 2.0, 'lam': None, 'delta': 0.01,
@@ -85,13 +99,17 @@ def _ej_aurea(rng):
             'x0': x0, 'x1': None, 'lam': lam, 'delta': None, 'datos': [('lam', lam, '-')]}
 
 def _ej_paracaidista_relax(rng):
-    ej = _ej_paracaidista(rng)
+    # UN SOLO sorteo, desde paracaidista_relax.md: el texto, `x0`, `lam` y las
+    # funciones f/g salen todos de los mismos numeros. Antes se sorteaba dos
+    # veces (paracaidista.md + paracaidista_relax.md) y el enunciado mostraba
+    # datos distintos a los que usaban f, g y la tabla de referencia.
     meta, ctx, d = cargar_ejercicio_md('paracaidista_relax.md', rng)
-    ej['lam'] = d['lam']
-    ej['titulo'] = meta['titulo']
-    ej['contexto'] = ctx
-    ej['datos'].append(('lam', d['lam'], '-'))
-    return ej
+    m, t, v, x0, lam = d['m'], d['t'], d['v'], d['x0'], d['lam']
+    f, df, ddf, gfun, dgfun = _paracaidista_modelo(m, t, v)
+
+    return {**meta, 'contexto': ctx, 'f': f, 'df': df, 'ddf': ddf, 'g': gfun, 'dg': dgfun,
+            'x0': x0, 'x1': x0 + 2.0, 'lam': lam, 'delta': 0.01,
+            'datos': [('m', m, 'kg'), ('t', t, 's'), ('v', v, 'm/s'), ('lam', lam, '-')]}
 
 def _ej_cubica(rng):
     meta, ctx, d = cargar_ejercicio_md('cubica.md', rng)

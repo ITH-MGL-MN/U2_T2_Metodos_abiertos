@@ -12,8 +12,18 @@ rangos:
   lam: [1.1, 1.3, 2]
 ---
 
-El coeficiente de arrastre $c$ del paracaidista ($m = {m}\text{ kg}$, $t = {t}\text{ s}$, $v = {v}\text{ m/s}$) se obtiene del despeje:
+Un paracaidista de masa $m = {m}\text{ kg}$ alcanza una velocidad $v = {v}\text{ m/s}$ tras
+caer $t = {t}\text{ s}$ (usa $g = 9.81\text{ m/s}^2$). El modelo físico es
 
-$$c = \frac{g m}{v}\left(1 - e^{-c t / m}\right)$$
+$$v = \frac{g m}{c}\left(1 - e^{-c t / m}\right),$$
 
-Dado que este despeje es lento, aplica **sobre-relajación** con **$\lambda = {lam}$** partiendo de **$c_0 = {x0}$**.
+que pasada toda a un lado queda
+
+$$f(c) = \frac{g m}{c}\left(1 - e^{-c t / m}\right) - v = 0,$$
+
+y su despeje equivalente es
+
+$$c = g(c) = \frac{g m}{v}\left(1 - e^{-c t / m}\right).$$
+
+Dado que este despeje converge lento, aplica **sobre-relajación** con
+**$\lambda = {lam}$** partiendo de **$c_0 = {x0}$**.

@@ -28,7 +28,7 @@ from profe.config import buscar, obtener_configuracion
 from profe.core import METODOS_MANO, NOMBRE_FUNCION, NOMBRE_METODO, elegir_mano
 from profe.core.evaluator import Tarea
 from profe.core.seed import extraer_nc, generar_semilla, obtener_rng
-from profe.core.solvers import iteraciones
+from profe.core.solvers import ES_DEFECTO, MAX_ITER, iteraciones
 
 # ---------------------------------------------------------------------
 #  Estado del cuaderno
@@ -46,6 +46,19 @@ ORDEN_COLUMNAS = {
     'NRM': ['i', 'x_i', 'f(x_i)', "f'(x_i)", "f''(x_i)", 'x', 'ea'],
     'SEC': ['i', 'x_{i-1}', 'x_i', 'f(x_{i-1})', 'f(x_i)', 'x', 'ea'],
     'SM':  ['i', 'x_i', 'x_i+dx', 'f(x_i)', 'f(x_i+dx)', 'x', 'ea'],
+}
+
+# Parámetros de arranque y su nombre en LaTeX (el orden importa: es el que
+# se ve en la línea de datos). `_PARAMS_METODO` dice cuáles usa cada método:
+# el ejercicio puede traer `lam` o `delta` sin que el método los necesite.
+_PARAMS_TEXTO = (('x0', 'x_0'), ('x1', 'x_1'), ('lam', r'\lambda'), ('delta', r'\delta'))
+_PARAMS_METODO = {
+    'PF':  ('x0',),
+    'PFM': ('x0', 'lam'),
+    'NR':  ('x0',),
+    'NRM': ('x0',),
+    'SEC': ('x0', 'x1'),
+    'SM':  ('x0', 'delta'),
 }
 
 # Encabezados "bonitos" para la impresión en texto plano.
@@ -66,9 +79,10 @@ COLUMNAS_EXPL = {
     'SEC': ('`x_{i-1}` y `x_i` = los DOS últimos valores  ·  `f(x_{i-1})` y `f(x_i)` = '
             'sus evaluaciones  ·  `x_{i+1}` = donde la recta que une esos dos puntos '
             'corta al eje $x$  ·  `ea (%)`.'),
-    'SM': ('`x_i` = valor de arranque  ·  `x_i+dx` = ese valor más el paso '
-           '$\\delta x_i$  ·  `f(x_i)` y `f(x_i+dx)` = las dos evaluaciones  ·  '
-           '`x_{i+1}` = el paso corregido con esa pendiente  ·  `ea (%)`.'),
+    'SM': ('`x_i` = valor de arranque  ·  `x_i+dx` = ese valor más el incremento '
+           'fijo $\\delta$ (no un porcentaje de $x_i$)  ·  `f(x_i)` y `f(x_i+dx)` = las '
+           'dos evaluaciones  ·  `x_{i+1}` = el paso corregido con esa pendiente  ·  '
+           '`ea (%)`.'),
 }
 
 
@@ -211,12 +225,11 @@ def _render_pregunta(i, p, peso=None, total=None):
     _display(_markdown('#### Pregunta %d: %s' % (i, p['titulo'])))
     if peso is not None and total:
         _display(_markdown('**Valor:** $\\frac{%g}{%g}$ puntos' % (peso, total)))
-    # Las preguntas de iteraciones traen el ejercicio al que se refieren: hay
-    # que enseñarlo, o el alumno no tiene de dónde sacar la tabla.
+    # Las preguntas de iteraciones se refieren al ejercicio de la sección, que
+    # el alumno ya tiene delante: se recuerda el TÍTULO nada más, sin repetir
+    # entero el enunciado (es el mismo de su actividad a mano).
     if p.get('_mostrar_ejercicio') and p.get('_ej'):
-        ej = p['_ej']
-        _display(_markdown('**Ejercicio:** %s' % ej['titulo']))
-        _display(_markdown(ej['contexto'].strip()))
+        _display(_markdown('**Ejercicio:** %s' % p['_ej']['titulo']))
     _display(_markdown(p['texto']))
     if p['tipo'] == 'funcion':
         _display(_markdown(
@@ -339,20 +352,44 @@ def comparar_practica(metodo, ej, resultado):
             print('   \u274c NO coincide con la referencia: revisa tu función antes de seguir')
         return
 
-    # Ejercicio de los que NO convergen (los "trampa" de punto fijo).
-    print('referencia : con el despeje del enunciado la iteración NO converge')
+    # La tabla no resolvió el ejercicio: puede ser DIVERGENCIA de verdad
+    # (|g'| >= 1) o simplemente LENTITUD (|g'| < 1 pero sin alcanzar εs en
+    # MAX_ITER pasos). Son cosas distintas y no conviene confundirlas.
+    lento = False
+    if ej.get('dg') is not None and ref is not None:
+        try:
+            lento = builtins.abs(ej['dg'](ref)) < 1.0
+        except (TypeError, ValueError, ZeroDivisionError):
+            lento = False
+
+    es = ej.get('_es', ES_DEFECTO)
+    if lento:
+        print('referencia : el despeje SÍ converge (|g\'(x*)| < 1), pero en %d '
+              'iteraciones' % MAX_ITER)
+        print('             no alcanza εs = %g %%: es lentitud, no divergencia.' % es)
+    else:
+        print('referencia : con el despeje del enunciado la iteración NO converge')
     if ref is not None:
-        print('             (la raíz que se busca es x* = %.8f: hay que cambiar de despeje)'
-              % ref)
+        if lento:
+            print('             (la raíz que se busca es x* = %.8f)' % ref)
+        else:
+            print('             (la raíz que se busca es x* = %.8f: hay que cambiar '
+                  'de despeje)' % ref)
     if coincide:
         print('   \u2705 Tu función SÍ llegó a la raíz: la probaste con otro despeje, no')
         print('      con el del enunciado. Lo que falla es la iteración del enunciado.')
     else:
-        print('\u26a0\ufe0f Tu función no está mal: es el despeje del enunciado el que no')
-        print("   converge (mira |g'(x*)| en el laboratorio de arriba). Compruébala con")
-        print('   un caso que sí converge:')
+        print('\u26a0\ufe0f Tu función no está mal:')
+        if lento:
+            print('   el despeje del enunciado converge, pero demasiado lento: en %d'
+                  % MAX_ITER)
+            print('   iteraciones no llega a εs = %g %% (mira el laboratorio de la λ).' % es)
+        else:
+            print("   es el despeje del enunciado el que no converge (mira |g'(x*)|")
+            print('   en el laboratorio de arriba).')
         cmd, valor = CASOS_PRUEBA.get(metodo, ('', ''))
         if cmd:
+            print('   Compruébala con un caso que sí converge:')
             print('       %s   ->   %s' % (cmd, valor))
 
 
@@ -416,15 +453,65 @@ def enviar(correo=None, marco=None, debug=False):
         return res
 
     if res['enviado']:
-        print('✅ Enviado. Respuesta del servidor: %s' % res['respuesta'][:300])
+        detalle = ''
+        aviso = res.get('aviso')
+        if isinstance(aviso, dict) and isinstance(aviso.get('data'), dict):
+            d = aviso['data']
+            detalle = ' Intento %s, total %.1f %%.' % (d.get('intento', '?'),
+                                                       d.get('total', 0.0))
+        print('\u2705 Enviado.%s Respuesta del servidor: %s'
+              % (detalle, res['respuesta'][:300]))
     else:
-        print('⚠️ No se pudo enviar a la hoja de cálculo: %s' % res.get('error'))
+        print('\u26a0\ufe0f No se pudo enviar a la hoja de cálculo: %s'
+              % res.get('error'))
     return res
 
 
 # =====================================================================
 #  ACTIVIDADES A MANO (con realimentación automática)
 # =====================================================================
+def _num_txt(valor):
+    """Número corto para el enunciado: 69.0 -> 69, 1e-05 -> 1e-05."""
+    try:
+        return '%g' % float(valor)
+    except (TypeError, ValueError):
+        return str(valor)
+
+
+def _datos_texto(metodo, ej):
+    """
+    Línea con los datos del ejercicio y los parámetros de arranque.
+
+    El enunciado (.md) cuenta las constantes físicas en prosa, pero los
+    parámetros del método (x0, x1, λ, δ) no siempre aparecen ahí: la secante
+    modificada necesita un δ que hasta ahora no se mostraba en ningún lado,
+    así que su tabla a mano era imposible de llenar.
+
+    Devuelve el Markdown de la línea, o None si no hay nada que mostrar.
+    """
+    piezas = []
+    for nombre, valor, unidad in (ej.get('datos') or []):
+        if nombre in ('ecuacion', 'lam'):
+            # 'ecuacion' no es un dato (es la ecuación del enunciado) y 'lam'
+            # se imprime abajo, en LaTeX y solo si el método la usa.
+            continue
+        sufijo = '' if not unidad or unidad == '-' else ' %s' % unidad
+        piezas.append('%s = %s%s' % (nombre, _num_txt(valor), sufijo))
+
+    usados = _PARAMS_METODO.get(metodo, ('x0',))
+    for clave, etiqueta in _PARAMS_TEXTO:
+        if clave not in usados:
+            continue
+        valor = ej.get(clave)
+        if valor is None:
+            continue
+        piezas.append('$%s = %s$' % (etiqueta, _num_txt(valor)))
+
+    if not piezas:
+        return None
+    return '**Datos y arranque:** ' + '  ·  '.join(piezas)
+
+
 def _marco_mano(metodo, ej):
     """
     Enunciado de la actividad a mano (sin revelar los resultados).
@@ -436,6 +523,9 @@ def _marco_mano(metodo, ej):
     _display(_markdown('### ✏️ Actividad a mano: %s' % NOMBRE_METODO[metodo]))
     _display(_markdown('**%s**' % ej['titulo']))
     _display(_markdown(ej['contexto'].strip()))
+    linea_datos = _datos_texto(metodo, ej)
+    if linea_datos:
+        _display(_markdown(linea_datos))
     filas = ej['_filas']
     n = builtins.min(3, builtins.len(filas))
     _display(_markdown('**Tu tabla para llenar a mano** (no redondees los pasos '

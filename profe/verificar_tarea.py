@@ -225,12 +225,17 @@ def main():
         total = builtins.sum(ex.pesos)
         if total != 20:
             fallo('%s: pesos suman %g (esperaba 20)' % (nc, total))
-        # tipo admitido por slot (los de iteraciones pueden ser 'simple' u 'opcion')
-        admitidos = [['opcion'], ['simple', 'opcion'], ['funcion'],
-                     ['simple', 'opcion'], ['funcion'], ['simple', 'opcion'],
-                     ['funcion'], ['simple', 'opcion'], ['funcion'],
-                     ['simple', 'opcion'], ['funcion'], ['simple', 'opcion'],
-                     ['funcion'], ['opcion']]
+        # tipo admitido por slot. Se deduce de la config en vez de escribir el
+        # orden a mano: así, si se reordenan los slots (por ejemplo para pedir
+        # el código antes que las iteraciones), el verificador sigue al día.
+        #   teorica       -> opcion
+        #   ejercicio_num -> simple, o 'opcion' si la pregunta sale conceptual
+        #   funcion       -> funcion
+        _ADMITIDOS = {'teorica': ['opcion'],
+                      'ejercicio_num': ['simple', 'opcion'],
+                      'funcion': ['funcion']}
+        admitidos = [_ADMITIDOS.get(sl.get('tipo', 'teorica'), ['simple', 'opcion'])
+                     for sl in ex.slots]
         for i, p in enumerate(ex.preguntas, 1):
             if p['tipo'] not in admitidos[i - 1]:
                 fallo('%s: reactivo %d es %s (esperaba %s)'
@@ -306,8 +311,16 @@ def main():
             ex = g.Examen(nc)
         except Exception:
             continue
+        # posición del reactivo de iteraciones de cada método, leída de la
+        # config (no fija): así sigue valiendo si se reordenan los slots.
+        idx_iter = {}
+        for k, sl in enumerate(ex.slots):
+            if sl.get('tipo') == 'ejercicio_num':
+                idx_iter[sl.get('metodo')] = k
         for etq in ('PF', 'PFM', 'NR', 'NRM', 'SEC', 'SM'):
-            idx = {'PF': 2, 'PFM': 4, 'NR': 6, 'NRM': 8, 'SEC': 10, 'SM': 12}[etq] - 1
+            idx = idx_iter.get(etq)
+            if idx is None:
+                continue
             ej = ex.preguntas[idx].get('_ej')
             if ej is None:
                 continue

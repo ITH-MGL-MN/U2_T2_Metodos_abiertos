@@ -97,6 +97,16 @@ def construir_bundle():
     if not textos_md:
         raise SystemExit('No encontré ningún enunciado en profe/ejercicios/*.md')
 
+    # Los textos de las preguntas del examen (ficha de cada método + la de
+    # iteraciones) viajan igual de embebidos.
+    textos_eval = {}
+    patron = os.path.join(RAIZ_DIR, 'profe', 'evaluador', '*.md')
+    for ruta in sorted(glob.glob(patron)):
+        with open(ruta, 'r', encoding='utf-8') as f:
+            textos_eval[os.path.basename(ruta)] = f.read()
+    if not textos_eval:
+        raise SystemExit('No encontré las preguntas en profe/evaluador/*.md')
+
     # 2) Código: los módulos, en orden de dependencia.
     partes = [CABECERA, '']
     partes.append('# ------------------- datos embebidos -------------------')
@@ -104,6 +114,7 @@ def construir_bundle():
     partes.append('DATOS_CONFIG_YAML = %r' % (cfg,))
     partes.append('DATOS_PREGUNTAS_YAML = %r' % (preguntas,))
     partes.append('DATOS_MARKDOWN_DICT = %r' % (textos_md,))
+    partes.append('DATOS_EVALUADOR_DICT = %r' % (textos_eval,))
     partes.append('')
 
     for modulo in MODULOS:
@@ -129,7 +140,8 @@ def construir_bundle():
           % (os.path.getsize(ruta_local) / 1024.0))
     print('   grader_ofuscado.txt %6.1f KB  (blob, lo usa el cuaderno en Colab)'
           % (os.path.getsize(ruta_ofuscada) / 1024.0))
-    print('   módulos: %d   enunciados: %d' % (len(MODULOS), len(textos_md)))
+    print('   módulos: %d   enunciados: %d   preguntas: %d'
+          % (len(MODULOS), len(textos_md), len(textos_eval)))
 
 
 if __name__ == '__main__':

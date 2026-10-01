@@ -20,4 +20,6 @@ $$v = \frac{g m}{c}\left(1 - e^{-c\,t/m}\right)$$
 
 donde $g = 9.81\text{ m/s}^2$. 
 
+Pasando todo a un lado, la ecuación que se resuelve es $f(c) = \dfrac{g m}{c}\left(1 - e^{-c\,t/m}\right) - v = 0$.
+
 Determina el **coeficiente de arrastre $c$** necesario para alcanzar dicha velocidad.

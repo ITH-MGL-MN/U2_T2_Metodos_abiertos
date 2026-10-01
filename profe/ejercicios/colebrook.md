@@ -16,4 +16,8 @@ El factor de fricción **$f$** satisface la ecuación implícita de Colebrook:
 
 $$\frac{1}{\sqrt{f}} = -2 \log_{10}\left(\frac{\varepsilon}{3.7 D} + \frac{2.51}{Re \sqrt{f}}\right)$$
 
+Pasando todo a un lado, se resuelve $f(x) = 0$ con $x$ el factor de fricción:
+
+$$f(x) = \frac{1}{\sqrt{x}} + 2 \log_{10}\left(\frac{\varepsilon}{3.7 D} + \frac{2.51}{Re \sqrt{x}}\right) = 0.$$
+
 Obtén el valor de $f$.
