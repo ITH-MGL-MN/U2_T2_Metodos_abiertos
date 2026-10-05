@@ -27,6 +27,7 @@ from profe.core.solvers import iteracion_objetivo
 TOLERANCIA_SIMPLE = 1e-6        # respuestas numéricas ('simple'), relativa
 TOLERANCIA_FUNCION = 1e-4       # raíz de las preguntas de programación
 MIN_APROBACION = 0.9
+MAX_INTENTOS_DEFECTO = 2        # envíos permitidos; lo impone el Apps Script
 MAX_ITER_DEFECTO = 60
 CRITERIOS_PARO = [0.01, 0.1, 0.001]
 TOL_ITERACION = 0.5             # tolerancia de "¿en qué iteración...?"
@@ -54,6 +55,8 @@ class Tarea(object):
                                         TOLERANCIA_FUNCION))
         self.min_aprobacion = float(buscar(self.cfg, 'evaluacion.min_aprobacion',
                                            MIN_APROBACION))
+        self.max_intentos = int(buscar(self.cfg, 'evaluacion.max_intentos',
+                                       MAX_INTENTOS_DEFECTO))
         self.max_iter = int(buscar(self.cfg, 'evaluacion.max_iter', MAX_ITER_DEFECTO))
         self.criterios_paro = [float(v) for v in
                                buscar(self.cfg, 'evaluacion.criterios_paro', CRITERIOS_PARO)]
@@ -366,6 +369,42 @@ class Tarea(object):
             resultado['motivo'] = 'red'
             resultado['error'] = str(exc)
         return resultado
+
+    def consultar(self, timeout=30):
+        """
+        Pregunta al Apps Script qué hay guardado para este NC.
+
+        Usa la acción `intento`, que es de SOLO LECTURA: no escribe nada en la
+        hoja de cálculo, así que se puede llamar las veces que haga falta.
+        Sirve para saber cuántos intentos se han gastado antes de enviar.
+
+        Devuelve un diccionario con 'ok' y, si todo salió bien, los datos que
+        reporta la hoja: semilla, intento, estado, total y enviado.
+        """
+        if not self.url:
+            return {'ok': False, 'error': 'el webhook no está configurado'}
+        cuerpo = {'token': self.token, 'accion': 'intento',
+                  'tarea': self.id_tarea, 'NC': self.nc}
+        pet = urllib.request.Request(
+            self.url, data=json.dumps(cuerpo).encode('utf-8'),
+            headers={'Content-Type': 'text/plain;charset=utf-8'})
+        try:
+            with urllib.request.urlopen(pet, timeout=timeout) as resp:
+                texto = resp.read().decode('utf-8', 'replace')
+        except Exception as exc:                            # noqa: BLE001
+            return {'ok': False, 'error': str(exc)}
+
+        try:
+            aviso = json.loads(texto)
+        except ValueError:
+            return {'ok': False, 'error': texto, 'respuesta': texto}
+        if str(aviso.get('status', '')).lower() == 'error':
+            return {'ok': False, 'error': aviso.get('message', texto),
+                    'respuesta': texto}
+
+        res = {'ok': True, 'respuesta': texto}
+        res.update(aviso.get('data') or {})
+        return res
 
 
 # =====================================================================

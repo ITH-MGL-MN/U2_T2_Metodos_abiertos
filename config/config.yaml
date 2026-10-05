@@ -20,6 +20,7 @@ evaluacion:
   tolerancia_simple: 1e-6          # respuestas numéricas (relativa)
   tolerancia_funcion: 1e-4         # raíz devuelta por las funciones del alumno
   min_aprobacion: 0.90             # 90 % de los 20 puntos para poder enviar
+  max_intentos: 2                  # envíos permitidos (lo impone el Apps Script)
   max_iter: 60                     # iteraciones de la tabla de referencia
   criterios_paro: [0.01, 0.1, 0.001]   # εs (%) que se sortean en las preguntas
   accion: "guardar"

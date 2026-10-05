@@ -16,8 +16,9 @@ Reglas del simulador
   · Replica el entorno: matplotlib en modo Agg, display() capturado.
   · Las celdas que se detienen con NotImplementedError se reportan como
     "pendiente" (es lo esperado: son los esqueletos de programacion).
-  · No hay acceso a internet: el envio se prueba con --experto en modo
-    `debug`.
+  · La ultima celda del cuaderno es `enviar(alumno_id)` y hace un POST REAL
+    al Apps Script: se OMITE, para no gastarle intentos al alumno.
+    Con la variable de entorno MN_ENVIAR_REAL=1 si se ejecuta.
 """
 import builtins
 import io
@@ -148,6 +149,11 @@ def main():
             print('   (celda %d: forzando el motor OFUSCADO)' % (k + 1))
         ns['display'] = captura          # el cuaderno lo re-importa: reponemos
         ns['get_ipython'] = lambda: None
+        if re.search(r'(?m)^\s*enviar\(', fuente) and not os.environ.get('MN_ENVIAR_REAL'):
+            # Esta celda manda el POST de verdad y consume un intento del
+            # alumno (la hoja solo acepta 2): no la ejecutamos.
+            print('   (celda %d: se omite el envio real)' % (k + 1))
+            continue
         buf = io.StringIO()
         try:
             with redirect_stdout(buf):

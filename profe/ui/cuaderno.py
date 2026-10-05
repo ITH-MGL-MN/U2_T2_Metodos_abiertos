@@ -38,6 +38,7 @@ _MANO = {}                 # metodo -> valores que reportó el alumno
 _MANO_EJ = {}              # metodo -> ejercicio de la actividad a mano
 _MANO_RES = {}             # metodo -> True si acertó la 3ª iteración
 _MANO_EC = {}              # metodo -> True si SUS lambdas coinciden
+_ULTIMO_ENVIO = None       # resultado del último enviar() (lo ve ultimo_envio())
 
 ORDEN_COLUMNAS = {
     'PF':  ['i', 'x_i', 'g(x_i)', 'x', 'ea'],
@@ -408,6 +409,21 @@ def _mostrar_resultados(filas):
     print('-' * 62)
 
 
+def _nota_ponderada(ex, porcentaje_auto):
+    """
+    Imprime la nota final del curso: 0.70 * automático + 0.30 * manual.
+
+    `porcentaje_auto` es el % del automático (0-100). La parte manual todavía
+    no existe en este punto (son las 6 rúbricas de la hoja de trabajo), así
+    que solo se muestra lo que aporta el automático.
+    """
+    print('NOTA FINAL (ponderada): %.1f / 100  =  %.2f × %.1f %%  +  %.2f × manual'
+          % (100.0 * ex.peso_auto * porcentaje_auto / 100.0, ex.peso_auto,
+             porcentaje_auto, ex.peso_mano))
+    print('   (falta el %.0f %% manual: las 6 rúbricas de la hoja de trabajo)'
+          % (100.0 * ex.peso_mano))
+
+
 def calificar(marco=None):
     """Califica las 14 preguntas automáticas y muestra el detalle."""
     ex = _EXAMEN
@@ -426,11 +442,45 @@ def calificar(marco=None):
         maximo += fila['peso']
     _mostrar_resultados(filas)
     print('AUTOMÁTICO: %.1f / %g  =  %.1f %%' % (puntos, maximo, 100.0 * puntos / maximo))
+    _nota_ponderada(ex, 100.0 * puntos / maximo)
     return puntos, maximo
 
 
+def ultimo_envio(detalle=False):
+    """
+    Resumen del último `enviar()`. Con `detalle=True` devuelve además el
+    diccionario completo (para depurar desde otra celda).
+
+    `enviar()` devuelve None a propósito: es la última celda del cuaderno, y
+    Jupyter imprime el valor de la última expresión de una celda, así que
+    devolver el diccionario volcaría en la salida el POST completo (con el
+    token del Apps Script) y los valores esperados de los casos ocultos.
+    """
+    if _ULTIMO_ENVIO is None:
+        print('Todavía no has llamado a enviar().')
+        return None
+    res = _ULTIMO_ENVIO
+    print('Último envío: %s  ·  %.1f %% (%g/%g puntos)'
+          % ('enviado' if res.get('enviado') else 'NO enviado',
+             res.get('calificacion', 0.0), res.get('puntos', 0.0),
+             res.get('maximo', 0.0)))
+    if res.get('motivo'):
+        print('   motivo: %s' % res['motivo'])
+    if res.get('error'):
+        print('   error : %s' % res['error'])
+    return res if detalle else None
+
+
 def enviar(correo=None, marco=None, debug=False):
-    """Envía el resultado automático al Apps Script (exige ≥ MIN_APROBACION)."""
+    """
+    Envía el resultado automático al Apps Script (exige ≥ MIN_APROBACION).
+
+    Devuelve None a propósito (el resultado queda en `_ULTIMO_ENVIO`, que
+    muestra `ultimo_envio()`): si devolviera el diccionario, Jupyter lo
+    imprimiría debajo de la celda. Con `debug=True` sí lo devuelve, porque
+    lo consumen las herramientas del profesor.
+    """
+    global _ULTIMO_ENVIO
     ex = _EXAMEN
     if ex is None:
         raise RuntimeError('Primero ejecuta generar_tarea(alumno_id).')
@@ -440,6 +490,7 @@ def enviar(correo=None, marco=None, debug=False):
     puntos, maximo = calificar(marco)
     correo = correo or marco.f_globals.get('alumno_id', '') or ex.alumno_id
     res = ex.enviar(_respuestas_del_cuaderno(marco), marco, debug=debug, correo=correo)
+    _ULTIMO_ENVIO = res
 
     if debug:
         print('POST', ex.url)
@@ -450,7 +501,8 @@ def enviar(correo=None, marco=None, debug=False):
         print('⛔ Aún no puedes enviar: necesitas al menos %g %% (%g puntos). '
               'Corrige y vuelve a intentarlo.'
               % (res['minimo'], ex.min_aprobacion * res['maximo']))
-        return res
+        print('   (este intento NO se gastó: no se guardó nada en la hoja)')
+        return None
 
     if res['enviado']:
         detalle = ''
@@ -464,7 +516,47 @@ def enviar(correo=None, marco=None, debug=False):
     else:
         print('\u26a0\ufe0f No se pudo enviar a la hoja de cálculo: %s'
               % res.get('error'))
-    return res
+    return None
+
+
+def consultar_calificacion():
+    """
+    Muestra lo que la hoja de cálculo tiene guardado para este alumno: los
+    intentos usados y el último total. NO envía nada (la consulta es de solo
+    lectura), así que no gasta intentos: se puede llamar las veces que sea.
+
+    Devuelve None a propósito, para que Jupyter no imprima nada debajo.
+    """
+    marco = inspect.currentframe().f_back
+    ex = _obtener_examen(marco=marco)
+    res = ex.consultar()
+
+    if not res.get('ok'):
+        print('\u26a0\ufe0f No pude consultar la hoja de cálculo: %s'
+              % res.get('error'))
+        print('   (la consulta no gasta intentos; revisa tu conexión y reintenta)')
+        return None
+
+    usados = int(res.get('intento') or 0)
+    total = res.get('total')
+    restantes = builtins.max(0, ex.max_intentos - usados)
+    print('NC %s  ·  %s' % (res.get('NC', ex.nc), res.get('tarea', ex.id_tarea)))
+    print('   Intentos usados : %d de %d' % (usados, ex.max_intentos))
+    print('   Te quedan       : %d' % restantes)
+    print('   Último total    : %s'
+          % ('%.1f %%' % float(total) if total is not None else '(todavía sin nota)'))
+    print('   Estado          : %s' % res.get('estado', '?'))
+    if total is not None:
+        _nota_ponderada(ex, float(total))
+    if total is not None and float(total) >= 100.0 * ex.min_aprobacion:
+        print('\u2705 Ya tienes guardado un envío con nota suficiente.')
+    elif restantes == 0:
+        print('\u26d4 Ya no te quedan intentos; si necesitas otra oportunidad,')
+        print('   habla con tu profesor.')
+    else:
+        print('   Todavía tienes %d intento%s: revisa con calificar() y luego envía.'
+              % (restantes, '' if restantes == 1 else 's'))
+    return None
 
 
 # =====================================================================
@@ -765,8 +857,9 @@ def semilla_de(alumno_id):
 
 __all__ = [
     'CASOS_PRUEBA', 'COLUMNAS_EXPL', 'ENCABEZADOS', 'ORDEN_COLUMNAS',
-    'calificar', 'comparar_practica', 'enviar', 'generar_examen', 'generar_tarea',
-    'hoja_manual', 'iteraciones', 'mano_comprueba', 'mano_ecuacion',
-    'mano_enunciado', 'mano_referencia', 'mano_solucion', 'pregunta', 'tabla',
-    'tabla_df', 'tabla_en_blanco'
+    'calificar', 'comparar_practica', 'consultar_calificacion', 'enviar',
+    'generar_examen', 'generar_tarea', 'hoja_manual', 'iteraciones',
+    'mano_comprueba', 'mano_ecuacion', 'mano_enunciado', 'mano_referencia',
+    'mano_solucion', 'pregunta', 'tabla', 'tabla_df', 'tabla_en_blanco',
+    'ultimo_envio'
 ]
